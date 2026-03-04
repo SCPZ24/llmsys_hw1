@@ -107,22 +107,21 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
             at the front of the result order list.
     """
     # BEGIN ASSIGN2_1
-    
+
     visited = set()
     ret = []
 
     def dfs(node: Variable):
-        if node.unique_id not in visited and not node.is_constant:
+        if node.unique_id not in visited and not node.is_constant():
             visited.add(node.unique_id)
-            for par_node in node.parents:
-                dfs(par_node)
+            if not node.is_leaf():
+                for par_node in node.parents:
+                    dfs(par_node)
             ret.append(node)
     
     dfs(variable)
     
-    return reversed(ret)
-
-    # END ASSIGN2_1
+    return ret[::-1]
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
