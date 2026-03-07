@@ -38,9 +38,7 @@ def binary_cross_entropy_loss(out, y):
     # 3. Calculate binary cross entropy and take mean
     # HINT: Use minitorch.tensor_functions.ones
     
-    batch = y.shape[0]
-    
-    L = -(y * out.log() + (1-y) * (minitorch.tensor_functions.ones(batch)-out).log())
+    L = -(y * out.log() + (minitorch.tensor_functions.ones(y.shape)-y) * (minitorch.tensor_functions.ones(y.shape)-out).log())
 
     return L.mean(0).view(1)
     
@@ -58,15 +56,11 @@ class Linear(minitorch.Module):
     
         self.weights = RParam(in_size, out_size)
         self.bias = RParam(out_size)
-
-        self.out_size = out_size
     
         # END ASSIGN2_2
 
     def forward(self, x):
-        
-        batch, in_size = x.shape
-        
+
         # BEGIN ASSIGN2_2
         # 1. Reshape the input x to be of size (batch, in_size)
         # 2. Reshape self.weights to be of size (in_size, self.out_size)
@@ -74,7 +68,7 @@ class Linear(minitorch.Module):
         # 4. Add self.bias
         # HINT: You can use the view function of minitorch.tensor for reshape
 
-        return x @ self.weights + self.bias
+        return x @ self.weights.value + self.bias.value
     
         # END ASSIGN2_2
         
@@ -127,7 +121,7 @@ class Network(minitorch.Module):
         # 5. Apply sigmoid and reshape to (batch)
         # HINT: You can use minitorch.nn.dropout for dropout, and minitorch.tensor.relu for ReLU
         
-        batch = embeddings.shape[0]
+        batch, _, embedding_dim = embeddings.shape
 
         _avg = embeddings.mean(1).view(batch, embedding_dim)
         _x1 = self.linear1(_avg) # batch * embedding_dim
@@ -189,8 +183,8 @@ class SentenceSentimentTrain:
     '''
         The trainer class of sentence sentiment classification
     '''
-    def __init__(self):
-        self.model = Network()
+    def __init__(self, embedding_dim=50, hidden_dim=32):
+        self.model = Network(embedding_dim, hidden_dim)
 
     def train(
         self,
@@ -231,9 +225,9 @@ class SentenceSentimentTrain:
                 x = minitorch.tensor(X_train[example_num: example_num+batch_size], backend=BACKEND)
                 y = minitorch.tensor(y_train[example_num: example_num+batch_size], backend=BACKEND)
 
-                pred = self.model(x)
+                out = self.model(x)
 
-                loss = binary_cross_entropy_loss(pred, y)
+                loss = binary_cross_entropy_loss(out, y)
                 
                 loss.backward()
 
@@ -255,13 +249,18 @@ class SentenceSentimentTrain:
                 model.eval()
                 
                 # BEGIN ASSIGN2_3
-                # TODO
                 # 1. Create x and y using minitorch.tensor function
                 # 2. Get the output of the model
                 # 3. Obtain validation predictions using the get_predictions_array function, and add to the validation_predictions list
                 # 4. Obtain the validation accuracy using the get_accuracy function, and add to the validation_accuracy list
                 
-                raise NotImplementedError("SentenceSentimentTrain train not implemented")
+                x = minitorch.tensor(X_val, backend=BACKEND)
+                y = minitorch.tensor(y_val, backend=BACKEND)
+                
+                out = self.model(x)
+                
+                validation_predictions += get_predictions_array(y, out)
+                validation_accuracy.append(get_accuracy(validation_predictions))
                 
                 # END ASSIGN2_3
                 
@@ -336,9 +335,10 @@ def encode_sentiment_data(dataset, pretrained_embeddings, N_train, N_val=0):
 if __name__ == "__main__":
     train_size = 450
     validation_size = 100
-    learning_rate = 0.025
-    max_epochs = 250
-    embedding_dim = 50
+    learning_rate = 0.03
+    max_epochs = 400
+    embedding_dim = 200
+    hidden_dim = 32
 
     (X_train, y_train), (X_val, y_val) = encode_sentiment_data(
         load_dataset("nyu-mll/glue", "sst2"),
@@ -346,7 +346,7 @@ if __name__ == "__main__":
         train_size,
         validation_size,
     )
-    model_trainer = SentenceSentimentTrain()
+    model_trainer = SentenceSentimentTrain(embedding_dim, hidden_dim=32)
     model_trainer.train(
         (X_train, y_train),
         learning_rate,
